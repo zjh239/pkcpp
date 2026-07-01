@@ -1,0 +1,19 @@
+
+[basic]
+file = "test/ga2o3_test.xyz"
+pbc = [1,1,0]
+dynamic = false
+path = ""
+
+[dynamic]
+dir = "test"
+interval = 3
+
+[nf] # neighbor list construct
+cutoff = 2.3
+
+[rdf] # radial distribution function
+cutoff = 6.0
+
+[poly] # polyhedral analysis
+c_type = 1

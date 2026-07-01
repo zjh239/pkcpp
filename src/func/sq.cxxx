@@ -1,0 +1,9 @@
+//sq.cxx
+// Calculate structural factor from the rdf data. Requires fftw lib.
+module;
+
+export module sq;
+
+export{
+
+}

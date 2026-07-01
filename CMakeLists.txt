@@ -1,0 +1,38 @@
+# Remember to use Ninja as generator for modules support.
+
+cmake_minimum_required(VERSION 3.29)
+
+project(pkcpp
+    VERSION 0.3
+    DESCRIPTION "Polikit: Polyhedral analyzing toolkits."
+    LANGUAGES CXX)
+
+# Force Ninja as the build system
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(CMAKE_CXX_SCAN_FOR_MODULES ON)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fdiagnostics-color=always")
+
+file(GLOB SRCS
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/basic/*.cxx"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/io/*.cxx"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/func/*.cxx"
+)
+
+add_executable(pkcpp)
+
+target_include_directories(pkcpp PRIVATE
+    ext/tomlpp/include
+)
+
+# first compile the modules
+target_sources(pkcpp
+    PRIVATE
+        FILE_SET modules TYPE CXX_MODULES FILES
+        ${SRCS}
+)
+
+# then compile the excutable file
+target_sources(pkcpp PRIVATE src/main.cxx)
