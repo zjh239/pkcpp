@@ -15,6 +15,9 @@ import types;
 
 export module parser;
 
+export import :cli_parser;
+export import :conf_parser;
+
 export {
 auto vars = toml::table{};
 
@@ -62,6 +65,7 @@ int show_version_msg(){
     return 0;
 };
 
+// get cutoff from string
 auto get_cutoffs(const std::string& a) -> std::vector<mreal>{
 
     std::vector<mreal> result;
@@ -155,10 +159,10 @@ void get_input_options(int argc, char** argv){
         }
         else if(cli== "-i" || cli=="--input"){
             // parser input config toml file.
-            std::string cli(argv[c+1]);
-            vars = toml::parse_file(cli);
+            std::string conf_file(argv[c+1]);
+            vars = toml::parse_file(conf_file);
             std::cout<<vars["basic"]<<std::endl;
-            ++c;
+            break;
         }
         else{
             show_input_err(argv[c]);
@@ -200,19 +204,15 @@ void get_input_options(int argc, char** argv){
 //
 //
 //     vector<int> vtr;
-//     //初始化容器
 //     for (int i = 0; i < 10; ++i)
 //     {
 //         vtr.push_back(i);
 //     }
-//     //利用迭代器遍历容器
 //
-//     cout << "方式1：";
 //     for (auto it = vtr.begin(); it != vtr.end(); ++it)
 //     {
 //         cout << *it << " ";
 //     }
-//     cout << "\n方式1：";
 //     for (auto it = begin(vtr); it != end(vtr); ++it)
 //     {
 //         cout << *it << " ";

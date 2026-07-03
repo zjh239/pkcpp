@@ -13,6 +13,10 @@ struct Atom {
     mreal x, y, z;
 };
 
+struct AtomList {
+    std::vector<mreal> x, y, z;
+};
+
 struct Box{
     mreal xmin, ymin, zmin;
     mreal xmax, ymax, zmax;
@@ -89,6 +93,8 @@ struct NeighList{
         return *this;
     }
 };
+
+// bin is the mesh when doing neighbor building.
 using BinList = NeighList;
 
 struct DeltaList{};

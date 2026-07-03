@@ -21,6 +21,8 @@ file(GLOB SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/func/*.cxx"
 )
 
+find_package(OpenMP REQUIRED)
+
 add_executable(pkcpp)
 
 target_include_directories(pkcpp PRIVATE
@@ -36,3 +38,7 @@ target_sources(pkcpp
 
 # then compile the excutable file
 target_sources(pkcpp PRIVATE src/main.cxx)
+
+if (OpenMP_CXX_FOUND)
+    target_link_libraries(pkcpp PRIVATE OpenMP::OpenMP_CXX)
+endif()

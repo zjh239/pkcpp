@@ -18,9 +18,17 @@ export module nf;
 
 export{
 
-size_t nt = 2; // set thread number from xmake in future
+size_t nt = 1; // set thread number from xmake in future
 
-// Print neighbor list.
+void print_neigh_list(const NeighList& my_neigh_list,
+                      const std::vector<Atom>& atoms){
+  int natom = atoms.size();
+
+  for (int i = 0; i < natom; ++i){
+    pklog.trace("{} {}", i+1, my_neigh_list.n[i]);
+  }
+};
+
 void print_bin(Bin& kk){
     int n = kk.n;
     std::cout<<"(num): "<<n<<" (ids):";
@@ -30,17 +38,17 @@ void print_bin(Bin& kk){
     std::cout<<std::endl;
 };
 
-void find_neighbors(const BinList& bins,
+void find_neighbors(const Box& mbox,
+                    const BinList& bins,
                     const std::vector<std::array<mreal, 3>> xyz0,
                     const int start, const int end,
                     const std::array<int, 3> bin_num,
-                    mreal cutoff,
+                    const mreal cutoff,
                     const std::vector<bool> is_border,
                     bool cal_delta,
                     NeighList& neigh_list,
                     std::vector<std::vector<std::array<float, 3>>>& delta){
-
-    const mreal r = cutoff*cutoff;
+    
 
     int cap=std::ceil(cutoff*cutoff*cutoff);
 
@@ -50,32 +58,42 @@ void find_neighbors(const BinList& bins,
         kk.resize(cap);
     }
     }
-
+    
+    // i : bin index;
+    // j : first atom index;
+    // k : second atom index;
+    // m : adjacent bin index;
     for (int i=start;i<end;++i){
         if(!is_border.at(i)){
             int x_bin = i % (bin_num[0]+2);
             int y_bin = (i % ((bin_num[0]+2)*(bin_num[1]+2))) / (bin_num[0]+2);
             int z_bin = i / ((bin_num[0]+2)*(bin_num[1]+2));
 
-        for (int atom = 0; atom < bins.n.at(i); ++atom){
-            int id =  bins.ids.at(i).at(atom);
-
-            pklog.trace("{} {} {} {} {} {} {}", id, x_bin, y_bin, z_bin, xyz0.at(id)[0], xyz0.at(id)[1], xyz0.at(id)[2]);
+        for (int j = 0; j < bins.n.at(i); ++j){
+            int id =  bins.ids.at(i).at(j);
 
             for (int p = -1; p<=1; ++p){
                 for (int q = -1; q<=1; ++q){
                     for (int o = -1; o<=1; ++o){
-                        int checked_index = x_bin+p
+                        
+                        int m = x_bin+p
                                         + (y_bin+q)*(bin_num[0]+2)
                                         + (z_bin+o)*(bin_num[0]+2)*(bin_num[1]+2);
-                        int checked_n = bins.n.at(checked_index);
-                        for (int atom2 = 0; atom2 < checked_n; ++atom2){
-                            int checkid = bins.ids.at(checked_index).at(atom2);
+
+                        mreal x_shift = (x_bin+p ==0 || x_bin+p == bin_num[0]+1) ? mbox.lx*p : 0.0;
+                        mreal y_shift = (y_bin+q ==0 || y_bin+q == bin_num[1]+1) ? mbox.ly*q : 0.0;
+                        mreal z_shift = (z_bin+o ==0 || z_bin+o == bin_num[2]+1) ? mbox.lz*o : 0.0;
+                        int checked_n = bins.n.at(m);
+                        for (int k = 0; k < checked_n; ++k){
+                            int checkid = bins.ids.at(m).at(k);
+
                             if (checkid < id){
-                                mreal d = (xyz0[id][0]-xyz0[checkid][0])*(xyz0[id][0]-xyz0[checkid][0])
-                                        + (xyz0[id][1]-xyz0[checkid][1])*(xyz0[id][1]-xyz0[checkid][1])
-                                        + (xyz0[id][2]-xyz0[checkid][2])*(xyz0[id][2]-xyz0[checkid][2]);
-                                if (d < r) {
+                                mreal dx = xyz0[id][0] - xyz0[checkid][0] - x_shift;
+                                mreal dy = xyz0[id][1] - xyz0[checkid][1] - y_shift;
+                                mreal dz = xyz0[id][2] - xyz0[checkid][2] - z_shift;
+                                mreal d = std::hypot(dx, dy, dz);
+                                
+                                if (d < cutoff) {
                                     neigh_list.ids.at(checkid).at(neigh_list.n.at(checkid)) = id;
                                     neigh_list.ids.at(id).at(neigh_list.n.at(id)) = checkid;
 
@@ -209,6 +227,7 @@ auto build_neighbors(const std::vector<mreal> cutoff,
         int end = (t == num_threads - 1) ? bin_num_1d : start + per_cpu_bin;
         pklog.debug("Thread {} will handle bins from {} to {};", t, start, end-1);
         threads[t] = std::thread(find_neighbors,
+                                std::cref(mbox),
                                  std::cref(bins),
                                  std::cref(realxyz),
                                  start, end,
@@ -223,10 +242,12 @@ auto build_neighbors(const std::vector<mreal> cutoff,
     for (int t = 0; t < num_threads; ++t){
         threads[t].join();
     }
-
-    return merge_neighbor(multi_nlist);
-
-
+    
+    NeighList final_nl = merge_neighbor(multi_nlist);
+    print_neigh_list(final_nl, atoms);
+    return final_nl;
+    
+    //return merge_neighbor(multi_nlist);
 };
 
 

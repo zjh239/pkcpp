@@ -1,0 +1,7 @@
+
+[basic]
+file = "../test/ga2o3_test.xyz"
+pbc = 1
+
+[analysis]
+nf = true

@@ -5,6 +5,10 @@ module;
 #include <iostream>
 #include <cmath>
 
+#ifdef _OPENMP
+    #include <omp.h>
+#endif
+
 import types;
 import logger;
 export module binning;
@@ -13,18 +17,25 @@ export{
 
 // Put atoms to the bin.
 void sort_atom_to_bin(std::vector<std::array<mreal, 3>> xyz0, int start, int end, std::array<int,3> binnum, mreal r, BinList& thread_bins){
-    int binidex, xbin, ybin, zbin;
 
+    #pragma omp parallel for
     for (int id=start; id < end; ++id){
-        xbin = std::ceil(xyz0[id][0]/r);
-        ybin = std::ceil(xyz0[id][1]/r);
-        zbin = std::ceil(xyz0[id][2]/r);
+
+        int thread_id = omp_get_thread_num();
+
+        int xbin = std::ceil(xyz0[id][0]/r);
+        int ybin = std::ceil(xyz0[id][1]/r);
+        int zbin = std::ceil(xyz0[id][2]/r);
 
         if (xbin > binnum[0]) xbin = binnum[0];
         if (ybin > binnum[1]) ybin = binnum[1];
         if (zbin > binnum[2]) zbin = binnum[2];
 
-        binidex = xbin + ybin*(binnum[0]+2) + zbin*(binnum[0]+2)*(binnum[1]+2);
+        if (xbin == 0) xbin = 1;
+        if (ybin == 0) ybin = 1;
+        if (zbin == 0) zbin = 1;
+
+        int binidex = xbin + ybin*(binnum[0]+2) + zbin*(binnum[0]+2)*(binnum[1]+2);
         int k = thread_bins.n.at(binidex);
         thread_bins.ids.at(binidex).at(k) = id;
         thread_bins.n.at(binidex) += 1;

@@ -1,11 +1,12 @@
-// para.cxx
+// parallel.cxx
+// parallel computing
 module;
 
 #include <iostream>
 #include <vector>
 #include <thread>
 
-export module para;
+export module parallel;
 export {
 
 // Function that computes the sum of a subarray

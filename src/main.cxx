@@ -5,7 +5,7 @@
 #include <iostream>
 
 import init;
-import para;
+import parallel;
 import nf;
 
 int main(int argc,char** argv){
