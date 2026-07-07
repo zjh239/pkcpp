@@ -5,8 +5,6 @@ module;
 #include <thread>
 #include <iostream>
 #include <cmath>
-#include <algorithm>
-#include <numeric>
 
 import binning;
 import types;
@@ -15,88 +13,60 @@ import logger;
 export module rdf;
 export{
 
-struct RawRDF{
-    int ntype, nb;
-    std::vector<std::vector<std::vector<int>>> count;
-
-    RawRDF() : ntype(0), nb(0) {}
-
-    RawRDF(int n, int cap) : ntype(n), nb(cap){
-        count.resize(ntype);
-        for(std::vector<std::vector<int>>& kk : count){
-            kk.resize(ntype);
-            for(std::vector<int>& pp : kk){
-                pp.resize(cap);
-            }
-        }
-    }
-};
-
-struct Histogram{
-    int cap;
-    std::vector<float> lbound, ubound, center;
-
-    Histogram(float cutoff, int capacity) : cap(capacity) {
-        const float binsize = cutoff / static_cast<float>(cap);
-
-        lbound.resize(cap);
-        ubound.resize(cap);
-        center.resize(cap);
-
-        std::iota(lbound.begin(), lbound.end(), 0.0f);
-        std::transform(lbound.begin(), lbound.end(), lbound.begin(),
-                      [binsize](float v) { return v * binsize; });
-
-        std::transform(lbound.begin(), lbound.end(), ubound.begin(),
-                      [binsize](float v) { return v + binsize; });
-
-        std::transform(lbound.begin(), lbound.end(), center.begin(),
-                      [binsize](float v) { return v + binsize * 0.5f; });
-    }
-};
-
-void compute_dist(const BinList& bins,
-                  const std::vector<std::array<mreal, 3>> xyz0,
-                  int start, int end,
-                  const std::array<int, 3> bin_num,
-                  mreal cutoff,
-                  const std::vector<bool> is_border,
-                  const std::vector<int>& ptype,
-                  RawRDF& rdf_raw){
-
-    const mreal r = cutoff*cutoff;
-    const Histogram his(cutoff, rdf_raw.nb);
-
+// like neighbor finder, construct a pair-wise counting histogram
+void sort_to_rdf_hist(const Box& mbox,
+                      const BinList& bins,
+                      const AtomList& xyz0,
+                      const int start, const int end,
+                      const std::array<int, 3> bin_num,
+                      const mreal cutoff,
+                      const std::vector<bool>& is_border,
+                      RDFCount& rdf_raw){
+    pklog.debug("are you okay?");
+    const int nbin = rdf_raw.nbin;
+    HistPos his(cutoff, nbin);
+    
+    // i: bin index
+    // j: first atom index
+    // h: second atom index
+    // m: adjacent bin index
     for (int i=start;i<end;++i){
         if(!is_border.at(i)){
-        int z_bin = i / ((bin_num[0]+2)*(bin_num[1]+2));
-        int y_bin = (i % ((bin_num[0]+2)*(bin_num[1]+2))) / (bin_num[0]+2);
-        int x_bin = i % (bin_num[0]+2);
-        // std::cout<<x_bin<<" "<<y_bin<<" "<<z_bin<<std::endl;
-        for (int atom = 0; atom < bins.n[i]; ++atom){
-            int id =  bins.ids[atom].at(i);
-            for (int p = -1; p<=1; ++p){
-                for (int q = -1; q<=1; ++q){
-                    for (int o = -1; o<=1; ++o){
-                        int checked_index = x_bin+p
-                                        + (y_bin+q)*(bin_num[0]+2)
-                                        + (z_bin+o)*(bin_num[0]+2)*(bin_num[1]+2);
-                        int checked_n = bins.n[checked_index];
-                        for (int atom2 = 0; atom2 < checked_n; ++atom2){
-                            int checkid = bins.ids[atom2].at(checked_index);
-                            if (checkid < id){
-                                mreal d = (xyz0[id][0]-xyz0[checkid][0])*(xyz0[id][0]-xyz0[checkid][0])
-                                        + (xyz0[id][1]-xyz0[checkid][1])*(xyz0[id][1]-xyz0[checkid][1])
-                                        + (xyz0[id][2]-xyz0[checkid][2])*(xyz0[id][2]-xyz0[checkid][2]);
-                                if (d < r) {
-                                    int type_1 = ptype.at(id);
-                                    int type_2 = ptype.at(checkid);
+            int z_bin = i / ((bin_num[0]+2)*(bin_num[1]+2));
+            int y_bin = (i % ((bin_num[0]+2)*(bin_num[1]+2))) / (bin_num[0]+2);
+            int x_bin = i % (bin_num[0]+2);
+            
+            pklog.debug("Analyzing bin {} {} {};", x_bin, y_bin, z_bin);
 
-                                    for(int k=0; k<400;++k){
-                                        if(k < his.ubound.at(k)){
-                                            rdf_raw.count[type_1][type_2][k] += 1;
-                                            rdf_raw.count[type_2][type_1][k] += 1;
-                                            break;
+            for (int j = 0; j < bins.n[i]; ++j){
+                int id =  bins.ids[i].at(j);
+                for (int p = -1; p<=1; ++p){
+                    for (int q = -1; q<=1; ++q){
+                        for (int o = -1; o<=1; ++o){
+                            int m = x_bin+p
+                                            + (y_bin+q)*(bin_num[0]+2)
+                                            + (z_bin+o)*(bin_num[0]+2)*(bin_num[1]+2);
+                            int checked_n = bins.n[m];
+                            for (int h = 0; h < checked_n; ++h){
+                                int checkid = bins.ids[h].at(m);
+                                if (checkid < id){
+                                    mreal dx = xyz0.x[id] - xyz0.x[checkid];
+                                    mreal dy = xyz0.y[id] - xyz0.y[checkid];
+                                    mreal dz = xyz0.z[id] - xyz0.z[checkid];
+                                    mreal d = std::hypot(dx, dy, dz);
+
+                                    if (d < cutoff) {
+                                        int type_1 = xyz0.ptype.at(id);
+                                        int type_2 = xyz0.ptype.at(checkid);
+
+                                        for(int k=0; k<nbin;++k){
+                                            if(k < his.ubound.at(k)){
+                                                //rdf_raw.count[type_1][type_2][k] += 1;
+                                                rdf_raw.at(type_1, type_2, k) += 1;
+                                                //rdf_raw.count[type_2][type_1][k] += 1;
+                                                rdf_raw.at(type_2, type_1, k) += 1;
+                                                break;
+                                            }
                                         }
                                     }
                                 }
@@ -107,21 +77,37 @@ void compute_dist(const BinList& bins,
             }
         }
     }
-    }
 
 };
 
-void merge_histogram(){};
+auto merge_histogram(std::vector<RDFCount>& multi_count) -> RDFCount {
+    RDFCount result(multi_count.at(0));
+
+    int n = multi_count.size();
+    for (int i=1;i<n;++i){
+        result += multi_count[i];
+    }
+
+    multi_count.clear();
+    multi_count.shrink_to_fit();
+
+    for (int i=0; i<result.nbin; ++i){
+        int j = result.at(0,0,i);
+        pklog.info("RDF at: {};", j);
+    }
+
+    return result;
+};
 
 // Divide the box into meshes to accelarate the neighbor list construction.
-void compute_rdf(std::vector<mreal> cutoff, std::vector<Atom>& atoms, Box mbox, std::vector<bool>& pbc){
+auto compute_rdf(const std::vector<mreal> cutoff,
+                 const AtomList& atoms,
+                 const Box mbox,
+                 const std::vector<bool>& pbc,
+                 const int hist_num = 400) -> RDFCount{
 
     pklog.warn("Starting radial distribution function analysis;");
-
-    const int num_threads = 4;
-
-    const int his_num = 400;
-    const int ntype = 3;
+    const int num_threads = thread_number;
 
     // Get the number of bins on each dimension.
     std::array<int,3> bin_num;
@@ -131,9 +117,10 @@ void compute_rdf(std::vector<mreal> cutoff, std::vector<Atom>& atoms, Box mbox, 
     bin_num[1] = std::floor(mbox.ly/r);
     bin_num[2] = std::floor(mbox.lz/r);
 
-    std::cout<<"Bin number on each dimension: "<<bin_num[0]+2<<" * "<<bin_num[1]+2<<" * "<<bin_num[2]+2<<std::endl;
+    pklog.info("Bin number on each dimension: {} x {} x {};", bin_num[0]+2, bin_num[1]+2, bin_num[2]+2);
 
     const int bin_num_1d = (bin_num[0]+2)*(bin_num[1]+2)*(bin_num[2]+2);
+    pklog.info("Total bin number: {};", bin_num_1d);
     int cap = std::ceil(r*r*r);
 
     std::vector<BinList> multi_bins(num_threads);
@@ -141,15 +128,17 @@ void compute_rdf(std::vector<mreal> cutoff, std::vector<Atom>& atoms, Box mbox, 
         aa = BinList(bin_num_1d, cap);
     }
 
-    const int natom = atoms.size();
+    const int natom = atoms.x.size();
 
-    std::vector<std::array<mreal, 3>> realxyz(natom);
-
+    AtomList xyz_real(natom);
+    
+    xyz_real.ntype = atoms.ntype;
     for(int i=0;i<natom;++i){
-    realxyz[i][0] = atoms[i].x - mbox.xmin;
-    realxyz[i][1] = atoms[i].y - mbox.ymin;
-    realxyz[i][2] = atoms[i].z - mbox.zmin;
+        xyz_real.x[i] = atoms.x[i] - mbox.xmin;
+        xyz_real.y[i] = atoms.y[i] - mbox.ymin;
+        xyz_real.z[i] = atoms.z[i] - mbox.zmin;
     }
+    xyz_real.ptype = atoms.ptype;
 
     int per_cpu_atom = natom / num_threads;
 
@@ -159,9 +148,9 @@ void compute_rdf(std::vector<mreal> cutoff, std::vector<Atom>& atoms, Box mbox, 
 
         int start = t * per_cpu_atom;
         int end = (t == num_threads - 1) ? natom : start + per_cpu_atom;
-        std::cout<<"This is thread "<<t<<std::endl;
+        pklog.debug("Thread {} will handle xyz from {} to {};", t, start, end-1);
         threads[t] = std::thread(sort_atom_to_bin,
-                                 std::cref(realxyz),
+                                 std::cref(xyz_real),
                                  start, end,
                                  bin_num,
                                  r,
@@ -174,42 +163,38 @@ void compute_rdf(std::vector<mreal> cutoff, std::vector<Atom>& atoms, Box mbox, 
 
     BinList bins = merge_bins(multi_bins);
 
-    multi_bins.clear();
-    multi_bins.shrink_to_fit();
-
     std::vector<bool> is_border = set_bins_pbc(bins, pbc, bin_num);
+    int tc = std::count(is_border.begin(), is_border.end(), true);
+    pklog.info("{} border bins modified;", tc);
 
-    // Histogram count raw data for each pair type.
-    std::vector<RawRDF> data_3d;
-    data_3d.resize(num_threads);
-    for(auto& kk: data_3d){
-        kk = RawRDF(3, 400);
-    }
-
-    // Distribute raw rdf histogram to thread and construct rdf.
-    int per_cpu_bin = his_num/ num_threads;
-    std::vector<int> ptype(natom);
-    std::transform(atoms.begin(), atoms.end(), ptype.begin(),
-                      [](const Atom& a) { return a.type; });
+    // multi thread data
+    std::vector<RDFCount> multi_count;
+    multi_count.reserve(num_threads);
+    multi_count.emplace_back(atoms.ntype, hist_num);
+    
+    int per_cpu_bin = bin_num_1d/ num_threads;
 
     for (int t = 0; t < num_threads; ++t) {
         int start = t * per_cpu_bin;
         int end = (t == num_threads - 1) ? bin_num_1d : start + per_cpu_bin;
-        std::cout<<"This is thread "<<t<<std::endl;
-        threads[t] = std::thread(compute_dist,
+        pklog.debug("Thread {} is handling bins from {} to {};", t, start, end);
+        threads[t] = std::thread(sort_to_rdf_hist, std::cref(mbox),
                                  std::cref(bins),
-                                 std::cref(realxyz),
+                                 std::cref(xyz_real),
                                  start, end,
                                  std::cref(bin_num),
                                  r,
                                  std::cref(is_border),
-                                 std::cref(ptype),
-                                 std::ref(data_3d.at(t)));
+                                 std::ref(multi_count.at(t)));
     }
 
     for (int t = 0; t < num_threads; ++t){
         threads[t].join();
     }
+    
+    RDF result(r, hist_num, atoms.ntype);
+
+    return merge_histogram(multi_count);
 
 };
 

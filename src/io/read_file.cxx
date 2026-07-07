@@ -10,7 +10,7 @@ export module read_file;
 
 export{
 
-auto read_types(const std::vector<std::string>& typechar) -> std::vector<int>{
+auto read_types(const std::vector<std::string>& typechar, int atoms_ntype) -> std::vector<int>{
     // Create dict of types
     std::vector<std::string> type_name;
     int type_num=1;
@@ -18,10 +18,10 @@ auto read_types(const std::vector<std::string>& typechar) -> std::vector<int>{
     std::vector<int> partype(natom, 0);
 
     type_name.push_back(typechar[0]);
-    for(int k=0;k<natom;++k){
-        for(int i=0;i<type_num;++i){
+    for(int k = 0; k < natom; ++k){
+        for(int i = 0; i < type_num; ++i){
             // std::cout<<typechar[k]<<" "<<type_name[i]<<std::endl;
-            if(typechar[k]==type_name[i]){
+            if(typechar[k] == type_name[i]){
                 // Assign integer type.
                 partype[k] = i+1;
                 break;
@@ -32,8 +32,9 @@ auto read_types(const std::vector<std::string>& typechar) -> std::vector<int>{
             }
         }
     }
-
-    for(size_t k=1;k<=type_num;++k){
+    atoms_ntype = type_num;
+    pklog.info("{} types of atoms read from file;", atoms_ntype);
+    for(size_t k=1; k<= type_num;++k){
         int number=std::count(partype.begin(), partype.end(), k);
         pklog.info("{} atoms with atom type {};", number, k);
     }
@@ -41,13 +42,12 @@ auto read_types(const std::vector<std::string>& typechar) -> std::vector<int>{
     return partype;
 };
 
-void read_xyz_file(std::string filename, Box& box, std::vector<Atom>& atoms){
+auto read_xyz_file(const std::string filename, Box& box) -> AtomList{
 
     pklog.warn("Reading data file;");
     std::ifstream file(filename);
     if (!file.is_open()) {
-        std::cerr << "Error: Unable to open file " << filename << std::endl;
-        return;
+        pklog.fatal("Unable to open file {}, stop.", filename);
     }
 
     int atom_num;
@@ -58,30 +58,30 @@ void read_xyz_file(std::string filename, Box& box, std::vector<Atom>& atoms){
     std::getline(file, line);   // read the \n symbol.
     std::getline(file, line);   // read comment line.
 
-    atoms.resize(atom_num);   // allocate space.
+    AtomList atoms(atom_num);
 
     std::vector<std::string> typechar(atom_num);
 
     // read atom xyz.
     for (int i = 0; i < atom_num; ++i) {
-        file >> typechar[i] >> atoms[i].x >> atoms[i].y >> atoms[i].z;
+        file >> typechar[i] >> atoms.x[i] >> atoms.y[i] >> atoms.z[i];
 
         if(i==0){
-            box.xmin = atoms[i].x;
-            box.ymin = atoms[i].y;
-            box.zmin = atoms[i].z;
+            box.xmin = atoms.x[i];
+            box.ymin = atoms.y[i];
+            box.zmin = atoms.z[i];
 
-            box.xmax = atoms[i].x;
-            box.ymax = atoms[i].y;
-            box.zmax = atoms[i].z;
+            box.xmax = atoms.x[i];
+            box.ymax = atoms.y[i];
+            box.zmax = atoms.z[i];
         }
-        box.xmin = std::min(box.xmin, atoms[i].x);
-        box.ymin = std::min(box.ymin, atoms[i].y);
-        box.zmin = std::min(box.zmin, atoms[i].z);
+        box.xmin = std::min(box.xmin, atoms.x[i]);
+        box.ymin = std::min(box.ymin, atoms.y[i]);
+        box.zmin = std::min(box.zmin, atoms.z[i]);
 
-        box.xmax = std::max(box.xmax, atoms[i].x);
-        box.ymax = std::max(box.ymax, atoms[i].y);
-        box.zmax = std::max(box.zmax, atoms[i].z);
+        box.xmax = std::max(box.xmax, atoms.x[i]);
+        box.ymax = std::max(box.ymax, atoms.y[i]);
+        box.zmax = std::max(box.zmax, atoms.z[i]);
     }
 
     file.close();
@@ -97,10 +97,10 @@ void read_xyz_file(std::string filename, Box& box, std::vector<Atom>& atoms){
     pklog.info("Simulation box dimension: {}, {}, {};", box.lx, box.ly, box.lz);
 
     // read types.
-    std::vector<int> ptype = read_types(typechar);
+    atoms.ptype = read_types(typechar, atoms.ntype);
 
     // check if pair wise cutoff is given with correct number and report the value for each pair.
 
-    return;
+    return atoms;
 };
 };

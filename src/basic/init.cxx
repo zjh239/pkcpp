@@ -20,12 +20,17 @@ export module init;
 export {
 void init_logger(){
     pklog.enable_console(true);
-    // game_logger.enable_file("game.log");
-    pklog.set_min_level(LogLevel::INFO);
+    // pklog.enable_file("game.log");
+    pklog.set_min_level(LogLevel::DEBUG);
 
 };
 
 void initialize(int argc, char** argv){
+
+    set_thread(1);  // empty for auto-detecting
+    pklog.warn("Thread number set to {};", thread_number);
+    // Set a default thread count, e.g., use hardware threads, but fallback to 2.
+    // int thread_count = hardware_threads != 0 ? hardware_threads : 2;
 
     init_logger();
 
@@ -33,17 +38,15 @@ void initialize(int argc, char** argv){
     save_config();
 
     Box box;
-    std::vector<Atom> atoms;
-    read_xyz_file(file_name, box, atoms);
-
-    int natom=atoms.size();
+    AtomList atoms = read_xyz_file(file_name, box);
 
     if (run_nf) {
         DeltaList delta_list;
         NeighList neighbor_list = build_neighbors(cutoffs, atoms, box, pbcs);
     }
     if (run_rdf) {
-        NeighList neighbor_list = build_neighbors(rdf_cut, atoms, box, pbcs);
+        //NeighList neighbor_list = build_neighbors(rdf_cut, atoms, box, pbcs);
+        RDFCount rdf_data = compute_rdf(rdf_cut, atoms, box, pbcs);
     }
     // std::cout<<atoms[1].x;
     // run_analysis();

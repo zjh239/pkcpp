@@ -1,13 +1,10 @@
 // binning.cxx
+// This module handle the sorting of atoms into bin.
 module;
 
 #include <vector>
 #include <iostream>
 #include <cmath>
-
-#ifdef _OPENMP
-    #include <omp.h>
-#endif
 
 import types;
 import logger;
@@ -16,16 +13,13 @@ export module binning;
 export{
 
 // Put atoms to the bin.
-void sort_atom_to_bin(std::vector<std::array<mreal, 3>> xyz0, int start, int end, std::array<int,3> binnum, mreal r, BinList& thread_bins){
+void sort_atom_to_bin(const AtomList& xyz0, int start, int end, std::array<int,3> binnum, mreal r, BinList& thread_bins){
 
-    #pragma omp parallel for
     for (int id=start; id < end; ++id){
 
-        int thread_id = omp_get_thread_num();
-
-        int xbin = std::ceil(xyz0[id][0]/r);
-        int ybin = std::ceil(xyz0[id][1]/r);
-        int zbin = std::ceil(xyz0[id][2]/r);
+        int xbin = std::ceil(xyz0.x[id]/r);
+        int ybin = std::ceil(xyz0.y[id]/r);
+        int zbin = std::ceil(xyz0.z[id]/r);
 
         if (xbin > binnum[0]) xbin = binnum[0];
         if (ybin > binnum[1]) ybin = binnum[1];
@@ -47,7 +41,7 @@ auto merge_bins(std::vector<BinList>& tmp_bins) -> BinList{
     BinList bins(tmp_bins.at(0));
     int n = tmp_bins.size();
     for (int i=1;i<n;++i){
-        bins+=tmp_bins[i];
+        bins += tmp_bins[i];
     }
 
     tmp_bins.clear();
@@ -102,7 +96,7 @@ auto set_bins_pbc(BinList& bins, const std::vector<bool>& pbc, const std::array<
 
     for (int i=a;i<=b;++i){
         int j = std::count(bins.n.begin(), bins.n.end(), i);
-        pklog.info("{} bins with atom number = {};", j, i);
+        pklog.debug("{} bins with atom number = {};", j, i);
     }
 
     return is_border;

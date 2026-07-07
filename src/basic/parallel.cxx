@@ -9,6 +9,8 @@ module;
 export module parallel;
 export {
 
+
+
 // Function that computes the sum of a subarray
 void partial_sum(const std::vector<int>& arr, size_t start, size_t end, long long& result) {
     long long sum = 0;

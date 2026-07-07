@@ -52,12 +52,12 @@ private:
 
     std::string_view level_to_string(LogLevel level) const {
         switch(level) {
-            case LogLevel::TRACE:   return "-trace-";
-            case LogLevel::DEBUG:   return "-debug-";
-            case LogLevel::INFO:    return "--info-";
-            case LogLevel::WARNING: return "--warn-";
-            case LogLevel::ERROR:   return "-error-";
-            case LogLevel::FATAL:   return "-fatal-";
+            case LogLevel::TRACE:   return "trace";
+            case LogLevel::DEBUG:   return "debug";
+            case LogLevel::INFO:    return "-info";
+            case LogLevel::WARNING: return "notis";
+            case LogLevel::ERROR:   return "error";
+            case LogLevel::FATAL:   return "fatal";
         }
         return "UNKNOWN";
     }
@@ -96,20 +96,20 @@ private:
         if (!console_output_) return;
 
         if (color && is_terminal()) {
-            std::println("{}[{:7s}]{} {}",
+            std::println("{}[{:5s}]{} {}",
                 level_to_color(level),
                 level_to_string(level),
                 Color::RESET,
                 message);
         } else {
-            std::println("[{:7s}] {}", level_to_string(level), message);
+            std::println("[{:5s}] {}", level_to_string(level), message);
         }
     }
 
     void write_to_file(LogLevel level, std::string_view message) {
         if (!file_output_ || !file_.is_open()) return;
 
-        file_ << std::format("[{}] [{:7s}] {}\n",
+        file_ << std::format("[{}] [{:5s}] {}\n",
             format_timestamp(),
             level_to_string(level),
             message);
